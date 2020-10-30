@@ -8,6 +8,11 @@ import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { buildSchema } from 'type-graphql';
 import { PostResolver } from './resolvers/post';
+import { UserResolver } from "./resolvers/user";
+import redis from 'redis';
+import session from 'express-session';
+import connectRedis from 'connect-redis';
+
 
 const main = async () => {
     const orm = await MikroORM.init(mikroConfig);
@@ -17,15 +22,33 @@ const main = async () => {
 
     const app = express();
 
+    const RedisStore = connectRedis(session);
+    const redisClient = redis.createClient();
+
+    app.use(session({
+        name: 'redis-clone',
+        store: new RedisStore({
+            client: redisClient,
+        }),
+
+        cookie: {
+            maxAge: 1000 * 60 * 5,
+            httpOnly: true,
+            sameSite: 'lax',
+            secure: __prod__
+        },
+        saveUninitialized: false,
+        secret: "redis-clone-secret",
+        resave: false
+    }))
+
     const appolloServer = new ApolloServer({
         schema: await buildSchema({
-            resolvers: [HelloResolver, PostResolver],
+            resolvers: [HelloResolver, PostResolver, UserResolver],
             validate: false
         }),
         // context is a special object that is available to all resolvers
-        context: () => ({
-           em : orm.em 
-        })
+        context: ({req, res}) => ({em: orm.em, req, res})
     })
 
     appolloServer.applyMiddleware({ app });

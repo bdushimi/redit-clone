@@ -4,7 +4,7 @@ import { Field, ObjectType } from "type-graphql";
 
 @ObjectType() // Converts a class into an object type
 @Entity()
-export class Post {
+export class User {
 
   @Field() // Exposing these field to a graphql schema
   @PrimaryKey()
@@ -19,7 +19,11 @@ export class Post {
   updatedAt = new Date();
 
   @Field()
+  @Property({type:"text", unique:true})
+  username!: string;
+    
+
   @Property({type:"text"})
-  title!: string;
+  password!: string;
 
 }
