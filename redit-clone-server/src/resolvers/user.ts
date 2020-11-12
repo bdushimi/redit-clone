@@ -2,7 +2,9 @@ import { User } from '../entities/User';
 import 'reflect-metadata';
 import { MyContext } from 'src/types';
 import { Arg, Ctx, Field, InputType, Mutation, ObjectType, Query, Resolver } from "type-graphql";
-import argon2  from 'argon2';
+import argon2 from 'argon2';
+import {EntityManager} from "@mikro-orm/postgresql"
+import { COOKIE_NAME } from "../constants";
 
 @InputType()
 class UsernamePasswordInput {
@@ -54,11 +56,19 @@ export class UserResolver {
         @Ctx() { em }: MyContext): Promise<UserResponse>
     {
         const hashedPassword = await argon2.hash(options.password);
-        const user = await em.create(User, { username: options.username, password: hashedPassword});
+        // const user = await em.create(User, { username: options.username, password: hashedPassword});
+        let user;
         try {
-            await em.persistAndFlush(user);
+            // await em.persistAndFlush(user);// This is the native way of interacting with the database
+            const result = await (em as EntityManager).createQueryBuilder(User).getKnexQuery().insert({
+                username: options.username,
+                password: hashedPassword,
+                created_at: new Date(),
+                updated_at: new Date()
+            }).returning("*");
+            user = result[0];
         } catch (error) {
-            if (error.code === "23505") {
+            if (error.detail.includes("already exists")) {
                 return {
                 errors: [
                     {
@@ -75,7 +85,7 @@ export class UserResolver {
     }
 
     
-    @Query(() => UserResponse)
+    @Mutation(() => UserResponse)
     async login(
         @Arg('options', () => UsernamePasswordInput) options: UsernamePasswordInput,
         @Ctx() { em, req }: MyContext): Promise<UserResponse>
@@ -108,5 +118,22 @@ export class UserResolver {
         return {
             user: user
         }
+    }
+
+    @Mutation(() => Boolean)
+    logout(
+        @Ctx() {req, res}: MyContext
+    ) {
+        return new Promise((resolve) =>
+            req.session.destroy((err) => {
+                res.clearCookie(COOKIE_NAME);
+                if (err) {
+                    console.log(err);
+                    resolve(false);
+                    return;
+                }
+                resolve(true);
+        })
+        );
     }
 }
