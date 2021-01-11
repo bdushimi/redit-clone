@@ -1,6 +1,6 @@
 import React from 'react';
 import { Formik, Form} from 'formik';
-import { Button, FormControl, FormErrorMessage, FormLabel, Input } from '@chakra-ui/core';
+import { Box, Button, Flex, FormControl, FormErrorMessage, FormLabel, Input, Link } from '@chakra-ui/core';
 import Wrapper from '../components/wrapper';
 import InputField from '../components/InputField';
 import { useMutation } from 'urql';
@@ -9,6 +9,7 @@ import { toErrorMap } from '../utils/toErrorMap';
 import { useRouter } from 'next/router';
 import { createUrqlClient } from '../utils/createUrqlClient';
 import { withUrqlClient } from 'next-urql';
+import NextLink from 'next/link';
 
 interface loginProps { }
 
@@ -48,7 +49,14 @@ export const Login: React.FC<loginProps> = ({ }) => {
       {({isSubmitting}) => (
         <Form>
               <InputField name="username" placeholder="Username" label="Username" />
-              <InputField name="password" placeholder="Password" label="Password" type="password" />
+              <Box mt={2}>
+                <InputField name="password" placeholder="Password" label="Password" type="password" />
+              </Box>
+              <Flex mt={2}>
+                <NextLink href="/forgot-password">
+                  <Link ml='auto'>Forgot Password?</Link>
+                </NextLink>
+              </Flex>
               <Button mt={5} type="submit" variantColor="teal" isLoading={isSubmitting}>Login</Button>
         </Form>
       )}
