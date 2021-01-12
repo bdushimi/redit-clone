@@ -2,7 +2,28 @@ import { cacheExchange } from "@urql/exchange-graphcache";
 import { dedupExchange, fetchExchange } from "urql";
 import { LogoutMutation, MeQuery, MeDocument, LoginMutation } from "../generated/graphql";
 import { betterUpdateQuery } from "./betterUpdateQuery";
+import { pipe, tap } from "wonka";
+import { Exchange } from 'urql';
 
+ // Since we're outside of react, no need to use useRouter
+import Router from 'next/router';
+
+
+const errorExchange: Exchange = ({ forward }) => ops$ => {
+
+    return pipe(
+        forward(ops$),
+        tap(({ error }) => {
+            // If the Operation Result has an error send a request to sentry
+            if (error?.message.includes('You are not authenticated')) {
+                
+                // Replace the current route in the history rather than pushing a new entry
+                Router.replace ('/');
+            }
+    
+        })
+    );
+}
 
 export const createUrqlClient = (ssrExchange: any) => ({
     url: "http://localhost:4000/graphql",
@@ -43,5 +64,5 @@ export const createUrqlClient = (ssrExchange: any) => ({
                 },
             }
         }
-    }), ssrExchange, fetchExchange]
+    }), errorExchange, ssrExchange, fetchExchange]
 });

@@ -69,7 +69,7 @@ const ChangePassword: NextPage<{ token: string }> = ({ token }) => {
     </Wrapper>
     );
 }
-
+// This function runs first before rendering the page and it passes its returns as props down to the component
 ChangePassword.getInitialProps = ({ query }) => {
   return {
     token: query.token as string,

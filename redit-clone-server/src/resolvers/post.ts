@@ -1,14 +1,23 @@
 import 'reflect-metadata';
 import { Post } from '../entities/Post';
-import { Arg, InputType, Int, Mutation, Query, Resolver } from "type-graphql";
+import { Arg, Ctx, Field, InputType, Int, Mutation, Query, Resolver, UseMiddleware } from "type-graphql";
+import { MyContext } from 'src/types';
+import { isAuth } from '../middleware/isAuth'
+import { getConnection } from 'typeorm';
 
+
+
+// This input type strongly types the input we're expected to get.
+@InputType()
+    class PostInputType {
+    @Field()
+    title: string
+
+    @Field()
+    text: string
+}
 @Resolver()
 export class PostResolver {
-
-    @InputType()
-         
-        
-        
         
     // Queries are for getting data
     @Query(() => [Post]) // Adds the return a graphql return type i.e () => [Post]
@@ -29,9 +38,29 @@ export class PostResolver {
 
     // Mutation are for creating/updating/deleting data
     @Mutation(() => Post)
+    @UseMiddleware(isAuth)
     async createPost(
-        @Arg('title', () => String) title: string): Promise<Post> {
-        return Post.create({ title }).save();
+        @Arg('input') input: PostInputType,
+        @Ctx() {req} : MyContext
+    ): Promise<Post> {
+
+        // This block of code is not working properly
+        // return Post.create({
+        //     title: input.title,
+        //     text: input.text,
+        //     creatorId : req.session.userId
+        // }).save();
+
+        const result = await getConnection()
+                .createQueryBuilder()
+                .insert().into(Post).values({
+                    title: input.title,
+                    text: input.text,
+                    creatorId : req.session.userId
+                }).returning("*")
+                .execute();
+            
+        return result.raw[0];
     }
 
 
