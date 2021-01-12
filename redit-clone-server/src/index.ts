@@ -1,9 +1,7 @@
 import "reflect-metadata"
 import { HelloResolver } from './resolvers/hello';
 
-import { MikroORM } from "@mikro-orm/core"
 import { COOKIE_NAME, __prod__ } from './constants';
-import mikroConfig from './mikro-orm.config';
 import express from 'express';
 import { ApolloServer } from 'apollo-server-express';
 import { buildSchema } from 'type-graphql';
@@ -13,14 +11,22 @@ import Redis from 'ioredis';
 import session from 'express-session';
 import connectRedis from 'connect-redis';
 import cors from 'cors';
+import { createConnection } from 'typeorm';
+import { Post } from "./entities/Post";
+import { User } from "./entities/User";
 
 
 
 const main = async () => {
-    const orm = await MikroORM.init(mikroConfig);
-    await orm.getMigrator().up();
-    // const post = await orm.em.create(Post, { title: "My first Post" });
-    // await orm.em.persistAndFlush(post);
+    await createConnection({
+        type: "postgres",
+        database: "development_db",
+        username: "developer",
+        password: "developer@123",
+        logging: true,
+        synchronize: true,
+        entities: [Post, User]
+    });
 
     const app = express();
 
@@ -54,7 +60,7 @@ const main = async () => {
             validate: false
         }),
         // context is a special object that is available to all resolvers
-        context: ({req, res}) => ({em: orm.em, req, res, redis})
+        context: ({req, res}) => ({req, res, redis})
     })
 
     appolloServer.applyMiddleware({ app, cors: false});

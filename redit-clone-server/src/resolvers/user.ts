@@ -3,10 +3,10 @@ import 'reflect-metadata';
 import { MyContext } from 'src/types';
 import { Arg, Ctx, Field, InputType, Mutation, ObjectType, Query, Resolver } from "type-graphql";
 import argon2 from 'argon2';
-import {EntityManager} from "@mikro-orm/postgresql"
 import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants";
 import { v4 } from 'uuid';
 import { sendEmail } from '../../src/utils/sendEmail';
+import { getConnection } from 'typeorm';
 
 @InputType()
 class UsernamePasswordInput {
@@ -45,7 +45,7 @@ export class UserResolver {
     async changePassword(
         @Arg('token') token: string,
         @Arg('newPassword') newPassword: string,
-        @Ctx() {redis, em, req}: MyContext
+        @Ctx() {redis, req}: MyContext
     ): Promise<UserResponse> {
         if (newPassword.length <= 2) {
             return {
@@ -71,7 +71,8 @@ export class UserResolver {
             }
         }
 
-        const user = await em.findOne(User, { id: parseInt(userId) });
+        const userIdNum = parseInt(userId);
+        const user = await User.findOne(userIdNum);
         if (!user) {
             return {
                 errors: [
@@ -83,8 +84,10 @@ export class UserResolver {
             }
         }
 
-        user.password = await argon2.hash(newPassword);
-        await em.persistAndFlush(user);
+        await User.update(
+            { id: userIdNum },
+            { password: await argon2.hash(newPassword)}
+        )
 
         // remove the token from redis so it won't be used again to reset the password
         await redis.del(key);
@@ -97,9 +100,11 @@ export class UserResolver {
     @Mutation(() => Boolean)
     async forgetPassword(
         @Arg('email') email: string,
-        @Ctx() { em, redis } : MyContext
+        @Ctx() { redis } : MyContext
     ) {
-        const user = await em.findOne(User, { username: email }); // The username is the email in this instance
+        // The username is the email in this instance
+        // Use WHERE when the column you're selecting from is not the primary key
+        const user = await User.findOne({where : { username: email }}); 
         if (!user) {
             // the email/username is not found
             return false;
@@ -120,34 +125,36 @@ export class UserResolver {
     }
 
     @Query(() => User, { nullable: true })
-    async me(
-        @Ctx() { em, req }: MyContext)
+    me(
+        @Ctx() {req }: MyContext)
     {
         if (!req.session.userId) {
             return null;
         }
-        const user = await em.findOne(User, { id: req.session.userId });
-        return user;
+        return User.findOne(req.session.userId);
     }
 
     @Mutation(() => UserResponse)
     async register(
-        @Arg('options', () => UsernamePasswordInput) options: UsernamePasswordInput,
-        @Ctx() { em }: MyContext): Promise<UserResponse>
+        @Arg('options', () => UsernamePasswordInput) options: UsernamePasswordInput): Promise<UserResponse>
     {
         const hashedPassword = await argon2.hash(options.password);
         // const user = await em.create(User, { username: options.username, password: hashedPassword});
         let user;
-        console.log('requests reaches here');
         try {
-            // await em.persistAndFlush(user);// This is the native way of interacting with the database
-            const result = await (em as EntityManager).createQueryBuilder(User).getKnexQuery().insert({
-                username: options.username,
-                password: hashedPassword,
-                created_at: new Date(),
-                updated_at: new Date()
-            }).returning("*");
-            user = result[0];
+
+            // User.create({}).save(); Using the model/entity to save the data.
+            // Using query builder
+            const result = await getConnection()
+                .createQueryBuilder()
+                .insert().into(User).values({
+                    username: options.username,
+                    password: hashedPassword,
+                }).returning("*")
+                .execute();
+            
+            user = result.raw[0];
+             
         } catch (error) {
             if (error.detail.includes("already exists")) {
                 return {
@@ -165,13 +172,12 @@ export class UserResolver {
         };
     }
 
-    
     @Mutation(() => UserResponse)
     async login(
         @Arg('options', () => UsernamePasswordInput) options: UsernamePasswordInput,
-        @Ctx() { em, req }: MyContext): Promise<UserResponse>
+        @Ctx() {req}: MyContext): Promise<UserResponse>
     {
-        const user = await em.findOne(User, { username: options.username });
+        const user = await User.findOne({ where: { username: options.username } });
         if (!user) {
             return {
                 errors: [
