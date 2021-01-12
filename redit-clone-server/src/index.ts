@@ -44,7 +44,7 @@ const main = async () => {
         }),
 
         cookie: {
-            maxAge: 1000 * 60 * 5,
+            maxAge: 1000 * 60 * 10,
             httpOnly: true,
             sameSite: 'lax',
             secure: __prod__
