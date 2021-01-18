@@ -16,7 +16,6 @@ export const NavBar: React.FC<NavBarProps> = ({ }) => {
     let body = null;
 
     if (fetching) {
-        console.log("fetching");
     } else if (!data?.me) {
         body = (
             <>
@@ -24,7 +23,7 @@ export const NavBar: React.FC<NavBarProps> = ({ }) => {
                     <Link mr={2} color="white"> Login</Link>
                 </NextLink>
                 <NextLink href="/register">
-                    <Link color="white">Register</Link>
+                    <Link  color="white">Register</Link>
             </NextLink>
             </>
         );
@@ -46,7 +45,7 @@ export const NavBar: React.FC<NavBarProps> = ({ }) => {
     
     return (
         <Flex bg="tomato" p={4}>
-            <Box ml={'auto'}>
+            <Box ml={"auto"}>
                 {body}
             </Box>
         </Flex>

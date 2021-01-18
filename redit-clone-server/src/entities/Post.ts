@@ -30,6 +30,7 @@ export class Post extends BaseEntity{
   creatorId: number;
 
   // ManyToOne i.e. many photos can belong to one user
+  @Field()
   @ManyToOne(() => User, user => user.posts)
   creator: User;
 

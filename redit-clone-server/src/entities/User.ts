@@ -3,11 +3,11 @@ import { BaseEntity, Column, CreateDateColumn, Entity, OneToMany, PrimaryGenerat
 import { Post } from "./Post";
 
 
-@ObjectType() // Converts a class into an object type
+@ObjectType() // Converts a class into an objectType that exposes all fields through GraphQL
 @Entity()
 export class User extends BaseEntity {
 
-  @Field() // Exposing these field to a graphql schema
+  @Field() // Exposing this field to a graphql schema
   @PrimaryGeneratedColumn()
   id!: number;
 
