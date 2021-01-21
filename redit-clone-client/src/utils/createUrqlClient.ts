@@ -1,4 +1,4 @@
-import { Query, VoteMutation, VoteMutationVariables } from './../generated/graphql';
+import { DeleteMutationVariables, Query, VoteMutation, VoteMutationVariables } from './../generated/graphql';
 import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
 import { dedupExchange, fetchExchange, stringifyVariables } from "urql";
 import { LogoutMutation, MeQuery, MeDocument, LoginMutation } from "../generated/graphql";
@@ -73,7 +73,7 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
   // This ensure that even server side rendered page get access of the cookie
   let cookie = "";
   if (isServer()) {
-    cookie = ctx.req.headers.cookie;
+    cookie = ctx?.req.headers.cookie;
   }
   return {
       url: "http://localhost:4000/graphql",
@@ -94,6 +94,12 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
         },
         updates: {
           Mutation: {
+            deletePost: (_result, args, cache, info) => {
+              cache.invalidate({
+                __typename: "Post",
+                id: (args as DeleteMutationVariables).id
+              })
+            },
               // This section caches the request sent to the server given a mutation
               // The result contains the result from the server
               // Args contains the arguments passed to the server i.e. passed to this mutation

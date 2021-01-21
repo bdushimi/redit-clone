@@ -3,7 +3,7 @@ import { withUrqlClient } from 'next-urql';
 import React from 'react'
 import Layout from '../components/Layout';
 import { NavBar } from '../components/Navbar'
-import { useGetPostsQuery } from '../generated/graphql';
+import { useDeleteMutation, useGetPostsQuery } from '../generated/graphql';
 import { createUrqlClient } from '../utils/createUrqlClient';
 import NextLink from 'next/link';
 import { useState }from 'react';
@@ -20,6 +20,8 @@ const Index = () => {
     variables
   });
 
+  const [, deletePost] = useDeleteMutation()
+
 
   if (!fetching && !data) {
     return <div>No Post fetched for some reason</div>
@@ -29,26 +31,40 @@ const Index = () => {
   return (
     <Layout>
       <Flex align="center">
-        <Heading>LeReddit</Heading>
-        <NextLink href="/create-post">
-        <Link ml="auto">Create Post</Link>
-      </NextLink>
       </Flex>
       <br />
       {fetching && !data ? (
         <div>Loading data....</div>
       ) : (
           <Stack spacing={8}>
-            {data!.getPosts.posts.map((post) => ( // adding an exclamation point to the variable forces typescript to believe that the variable wont' ever be undefined
+            {data!.getPosts.posts.map((post) =>
+              !post
+                ? null
+                :  
+            ( // adding an exclamation point to the variable forces typescript to believe that the variable wont' ever be undefined
               <Flex p={5} key={post.id} shadow="md" borderWidth="1px">
                 <UpdootSection post={ post}/>
-                <Box>
-                  <Heading fontSize="xl">{post.title}</Heading>
+                <Box flex={1}>
+                  <NextLink href="/post/[id]" as={`/post/${post.id}`}>
+                    <Link>
+                    <Heading fontSize="xl">{post.title}</Heading>
+                  </Link>
+                </NextLink>
                 <Text>Posted by {post.creator.username}</Text>
-                <Text mt={4}>{post.textSnippet}</Text>
+                  <Flex alignItems="center">
+                    <Text flex={1} mt={4}>{post.textSnippet}</Text>
+                    <IconButton
+                      icon="delete"
+                      aria-label="Delete Post"
+                      variantColor="red"
+                      onClick={() => {
+                        deletePost({id : post.id})
+                      }}
+                    />
+                  </Flex>
                 </Box>
               </Flex>
-            ))}
+            ))} 
           </Stack>
         
         )}
