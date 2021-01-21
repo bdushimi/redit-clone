@@ -1,13 +1,15 @@
-import { Query } from './../generated/graphql';
+import { Query, VoteMutation, VoteMutationVariables } from './../generated/graphql';
 import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
 import { dedupExchange, fetchExchange, stringifyVariables } from "urql";
 import { LogoutMutation, MeQuery, MeDocument, LoginMutation } from "../generated/graphql";
 import { betterUpdateQuery } from "./betterUpdateQuery";
 import { pipe, tap } from "wonka";
 import { Exchange } from 'urql';
+import gql  from 'graphql-tag';
 
  // Since we're outside of react, no need to use useRouter
 import Router from 'next/router';
+import { isServer } from './isServer';
 
 
 const errorExchange: Exchange = ({ forward }) => ops$ => {
@@ -62,10 +64,22 @@ const cursorPagination = (): Resolver => {
   };
 };
 
-export const createUrqlClient = (ssrExchange: any) => ({
-    url: "http://localhost:4000/graphql",
+export const createUrqlClient = (ssrExchange: any, ctx: any) => {
+ 
+  // From line 69 to 78
+  // Getting the cookie (from the browser i.e. request) 
+  // and making sure it gets sent to next.js server which sends it to GraphQL API 
+  // Browser -> Next.js -> GraphQL API
+  // This ensure that even server side rendered page get access of the cookie
+  let cookie = "";
+  if (isServer()) {
+    cookie = ctx.req.headers.cookie;
+  }
+  return {
+      url: "http://localhost:4000/graphql",
     fetchOptions: {
-        credentials: "include" as const,
+      credentials: "include" as const,
+      headers : cookie ? { cookie } : undefined
     },
     exchanges: [dedupExchange, cacheExchange({
         keys: {
@@ -79,7 +93,45 @@ export const createUrqlClient = (ssrExchange: any) => ({
             }
         },
         updates: {
-            Mutation: {
+          Mutation: {
+              // This section caches the request sent to the server given a mutation
+              // The result contains the result from the server
+              // Args contains the arguments passed to the server i.e. passed to this mutation
+            vote: (_result, args, cache, info) => {
+              const { postId, value } = args as VoteMutationVariables;
+
+              // Reading data from a fragment (PostSnippet) that operates on Post entity.
+              const data = cache.readFragment(
+                gql`
+                  fragment _ on Post {
+                    id
+                    points
+                    voteStatus
+                  }
+                `,
+                { id: postId } as any
+              );
+
+              if (data) {
+                if (data.voteStatus === value) {
+                  return;
+                }
+                const newPoints =
+                  (data.points as number) + (!data.voteStatus ? 1 : 2) * value;
+                
+                // Writting data to a fragment (PostSnippet) that operates on Post entity.
+                // This immediately updates the UI that reads data from the fragment without reloading the page
+                cache.writeFragment(
+                  gql`
+                    fragment __ on Post {
+                      points
+                      voteStatus
+                    }
+                  `,
+                  { id: postId, points: newPoints, voteStatus: value } as any
+                );
+              }
+            },
                 logout: (_result, args, cache, info) => {
 
                     // LoginMutation is the mutation being run and MeQuery is the query being cached/updated 
@@ -112,4 +164,5 @@ export const createUrqlClient = (ssrExchange: any) => ({
             }
         }
     }), errorExchange, ssrExchange, fetchExchange]
-});
+  }
+};

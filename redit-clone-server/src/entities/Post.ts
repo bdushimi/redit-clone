@@ -1,5 +1,6 @@
-import { Field, ObjectType } from "type-graphql";
-import { BaseEntity, Column, CreateDateColumn, Entity, ManyToOne, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Field, Int, ObjectType } from "type-graphql";
+import { BaseEntity, Column, CreateDateColumn, Entity, ManyToOne, OneToMany, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Updoot } from "./Updoot";
 import { User } from "./User";
 
 
@@ -13,7 +14,7 @@ export class Post extends BaseEntity{
   id!: number;
 
   @Field()
-  @Column()
+  @Column() // This adds the title to the Post table as a column
   title!: string;
 
   @Field()
@@ -24,6 +25,9 @@ export class Post extends BaseEntity{
   @Column({type:"int", default: 0})
   points!: number;
 
+  @Field(() => Int, { nullable: true})
+  voteStatus: number | null;
+
 
   @Field()
   @Column()
@@ -33,6 +37,9 @@ export class Post extends BaseEntity{
   @Field()
   @ManyToOne(() => User, user => user.posts)
   creator: User;
+
+  @OneToMany(() => Updoot, updoot => updoot.post)
+  updoots: Updoot[];
 
   @Field(() => String)
   @CreateDateColumn()
