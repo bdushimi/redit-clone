@@ -3,7 +3,7 @@ import { withUrqlClient } from 'next-urql';
 import React from 'react'
 import Layout from '../components/Layout';
 import { NavBar } from '../components/Navbar'
-import { useDeleteMutation, useGetPostsQuery } from '../generated/graphql';
+import { useDeleteMutation, useGetPostsQuery, useMeQuery } from '../generated/graphql';
 import { createUrqlClient } from '../utils/createUrqlClient';
 import NextLink from 'next/link';
 import { useState }from 'react';
@@ -15,6 +15,8 @@ const Index = () => {
     limit: 10,
     cursor: null as null | string // casting cursor variable to be either null or string
   });
+
+  const [{ data: meData }] = useMeQuery();
   
   const [{ data, fetching }] = useGetPostsQuery({
     variables
@@ -53,16 +55,36 @@ const Index = () => {
                 <Text>Posted by {post.creator.username}</Text>
                   <Flex alignItems="center">
                     <Text flex={1} mt={4}>{post.textSnippet}</Text>
-                    <IconButton
-                      icon="delete"
-                      aria-label="Delete Post"
-                      variantColor="red"
-                      onClick={() => {
-                        deletePost({id : post.id})
-                      }}
-                    />
+                    
+                        {
+                          meData?.me?.id !== post.creator.id
+                            ? null
+                            :
+
+                    
+                            (<Box ml="auto">
+                              <NextLink href="/post/edit/[id]" as={`post/edit/${post.id}`}>
+                                <IconButton
+                                  mr={2}
+                                  icon="edit"
+                                  aria-label="Edit Post"
+                                  variantColor="green"
+                                />
+                              </NextLink>
+                              <IconButton
+                                icon="delete"
+                                aria-label="Delete Post"
+                                variantColor="red"
+                                onClick={() => {
+                                  deletePost({ id: post.id })
+                                }}
+                              />
+                            </Box>
+                        )
+                     }  
                   </Flex>
                 </Box>
+                
               </Flex>
             ))} 
           </Stack>

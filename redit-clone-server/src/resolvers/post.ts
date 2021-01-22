@@ -171,7 +171,9 @@ export class PostResolver {
         // Add typescript types id: number
         @Arg('id', () => Int) id: number): Promise<Post | undefined> {
         // return a post or null i.e. Promise<Post | null
-        return Post.findOne(id);
+        // With the second parameter, typeorm finds in other tables (user table) where the creator field establishes a relationship
+        // and finds a user who created this post
+        return Post.findOne(id, {relations : ["creator"]});
     }
 
     // Mutation are for creating/updating/deleting data
@@ -201,27 +203,38 @@ export class PostResolver {
         return result.raw[0];
     }
 
-    @Mutation(() => Post, {nullable: true})
+    @Mutation(() => Post, { nullable: true })
+    @UseMiddleware(isAuth)
     async updatePost(
         @Arg('id', () => Int) id: number,
-        @Arg('title', () => String, {nullable: false}) title: string): Promise<Post | null> {
-        const post = await Post.findOne(id);
-        if (!post) {
-            return null;
-        }
-        if (typeof title !== 'undefined') {
-            await Post.update({ id }, { title });
-        }
-        return post;
+        @Arg('title', () => String, { nullable: false }) title: string,
+        @Arg('text', () => String, { nullable: false }) text: string,
+        @Ctx() {req} : MyContext
+    ): Promise<Post | null> {
+        // return Post.update({ id, creatorId : req.session.userId}, { title, text });
+        const result = await getConnection()
+            .createQueryBuilder()
+            .update(Post)
+            .set({ title, text })
+            .where('id = :id and "creatorId" = :creatorId',
+                { id, creatorId: req.session.userId })
+            .returning("*")
+            .execute();
+        
+        return result.raw[0];
     }
 
 
 
     @Mutation(() => Boolean)
+    @UseMiddleware(isAuth)
+    
     async deletePost(
-        @Arg('id', () => Int) id: number): Promise<boolean> {
+        @Arg('id', () => Int) id: number,
+        @Ctx() {req} : MyContext
+    ): Promise<boolean> {
         try {
-            await Post.delete(id);
+            await Post.delete({ id, creatorId : req.session.userId});
             return true;
         } catch (error) {
             return false;
