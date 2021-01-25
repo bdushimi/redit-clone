@@ -16,6 +16,8 @@ import { Post } from "./entities/Post";
 import { User } from "./entities/User";
 import path from 'path';
 import { Updoot } from "./entities/Updoot";
+import { createUserLoader } from "./utils/createUserLoader";
+import { createVoteStatusLoader } from "./utils/ createVoteStatusLoader";
 
 
 const main = async () => {
@@ -64,7 +66,15 @@ const main = async () => {
             validate: false
         }),
         // context is a special object that is available to all resolvers
-        context: ({req, res}) => ({req, res, redis})
+        // The context object is available to every single request
+        // Putting the userLoader here ensures that all users are batched/fetched once and cached within a single request
+        context: ({ req, res }) => ({
+            req,
+            res,
+            redis,
+            userLoader: createUserLoader(),
+            voteStatusLoader : createVoteStatusLoader()
+        })
     })
 
     appolloServer.applyMiddleware({ app, cors: false});

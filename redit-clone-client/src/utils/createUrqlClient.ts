@@ -1,5 +1,5 @@
 import { DeleteMutationVariables, Query, VoteMutation, VoteMutationVariables } from './../generated/graphql';
-import { cacheExchange, Resolver } from "@urql/exchange-graphcache";
+import { cacheExchange, Resolver, Cache} from "@urql/exchange-graphcache";
 import { dedupExchange, fetchExchange, stringifyVariables } from "urql";
 import { LogoutMutation, MeQuery, MeDocument, LoginMutation } from "../generated/graphql";
 import { betterUpdateQuery } from "./betterUpdateQuery";
@@ -63,6 +63,16 @@ const cursorPagination = (): Resolver => {
     };
   };
 };
+
+const invalidatePosts = (cache: Cache) => {
+  const allFields = cache.inspectFields("Query");
+  const fieldInfos = allFields.filter(
+    (info) => info.fieldName === "getPosts"
+  );
+  fieldInfos.forEach((fi) => {
+    cache.invalidate("Query", "getPosts", fi.arguments || {});
+  })
+}
 
 export const createUrqlClient = (ssrExchange: any, ctx: any) => {
  
@@ -166,6 +176,11 @@ export const createUrqlClient = (ssrExchange: any, ctx: any) => {
                             }
                         }
                     );
+                  invalidatePosts(cache);
+            },
+                
+            createPost: (_result, args, cache, info) => {
+                  invalidatePosts(cache);
                 },
             }
         }

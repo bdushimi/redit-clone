@@ -5,6 +5,7 @@ import { MyContext } from 'src/types';
 import { isAuth } from '../middleware/isAuth'
 import { getConnection } from 'typeorm';
 import { Updoot } from '../entities/Updoot';
+import { User } from '../entities/User';
 
 
 
@@ -44,50 +45,97 @@ export class PostResolver {
     ) {
         return root.text.slice(0, 50);
     }
+
+
+    // This fetches the user on each post related request no matter where it is coming from.
+    @FieldResolver(() => User)
+    creator(
+        @Root() post: Post,
+        @Ctx() {userLoader} : MyContext
+    ) {
+        return userLoader.load(post.creatorId);
+    }
+
+    @FieldResolver(() => Int)
+    async voteStatus(
+        @Root() post: Post,
+        @Ctx() { voteStatusLoader, req } : MyContext
+    ) {
+        if(!req.session.userId) return null;
+        const voteStatus = await voteStatusLoader.load({
+            postId: post.id, userId: req.session.userId
+        });
+
+        return voteStatus ? voteStatus.value : null;
+    }
         
     // Queries are for getting data
     @Query(() => PaginatedPosts) 
     async getPosts(
         @Arg('limit', () => Int) limit: number,
         @Arg('cursor', ()=> String, { nullable: true}) cursor: string | null, // if the argument can be null, its type must be speficied in the @Arg decoration
-        @Ctx() {req} : MyContext
+        // @Ctx() {req} : MyContext
     ): Promise<PaginatedPosts> { // Adds a typescript return type i.e Promise<Post[]>
 
         const realLimit = Math.min(50, limit);
         const realLimitPlusOne = realLimit + 1;
-        const userId = req.session.userId;
+        // const userId = req.session.userId;
 
         const replacement: any[] = [realLimitPlusOne];
 
-        if (userId) {
-            replacement.push(userId);
-        }
+        // if (userId) {
+        //     replacement.push(userId);
+        // }
 
-        let cursorIndex = 3;
+        //let cursorIndex = 3;
 
         if (cursor) {
             replacement.push(new Date(parseInt(cursor)));
-            cursorIndex = replacement.length;
+            //cursorIndex = replacement.length;
         }
 
         const posts = await getConnection().query(`
         
-        select p.*,
-        json_build_object(
-            'id', u.id,
-            'username', u.username
-        ) creator,
-        ${
-            userId 
-            ? '(select value from updoot where "userId" = $2 and "postId" = p.id) "voteStatus"'
-            : 'null as "voteStatus" '
-        }
+        select p.*
         from post p
-        inner join public.user u on u.id = p."creatorId"
-        ${cursor ? `where p."createdAt" < $${cursorIndex}` : ""}
+        ${cursor ? `where p."createdAt" < $2` : ""}
         order by p."createdAt" DESC
         limit $1
         `, replacement);
+
+
+        // version 2 before creating votestatus resolver
+
+        // select p.*,
+        // ${
+        //     userId 
+        //     ? '(select value from updoot where "userId" = $2 and "postId" = p.id) "voteStatus"'
+        //     : 'null as "voteStatus" '
+        // }
+        // from post p
+        // ${cursor ? `where p."createdAt" < $${cursorIndex}` : ""}
+        // order by p."createdAt" DESC
+        // limit $1
+        // `, replacement);
+
+        // version 1 of the query used above
+
+        // select p.*,
+        // json_build_object(
+        //     'id', u.id,
+        //     'username', u.username
+        // ) creator,
+        // ${
+        //     userId 
+        //     ? '(select value from updoot where "userId" = $2 and "postId" = p.id) "voteStatus"'
+        //     : 'null as "voteStatus" '
+        // }
+        // from post p
+        // inner join public.user u on u.id = p."creatorId"
+        // ${cursor ? `where p."createdAt" < $${cursorIndex}` : ""}
+        // order by p."createdAt" DESC
+        // limit $1
+        // `, replacement);
 
         // const qb = getConnection()
         //     .getRepository(Post)
@@ -162,9 +210,6 @@ export class PostResolver {
         return true
     }
     
-        
-
-
     @Query(() => Post, {nullable: true})
     getPost(
         // Adds graphql type i.e. 'id', () => Int
@@ -173,7 +218,9 @@ export class PostResolver {
         // return a post or null i.e. Promise<Post | null
         // With the second parameter, typeorm finds in other tables (user table) where the creator field establishes a relationship
         // and finds a user who created this post
-        return Post.findOne(id, {relations : ["creator"]});
+
+        // return Post.findOne(id, { relations: ["creator"] }); before the introduction of creator resolver
+        return Post.findOne(id);
     }
 
     // Mutation are for creating/updating/deleting data
@@ -228,7 +275,7 @@ export class PostResolver {
 
     @Mutation(() => Boolean)
     @UseMiddleware(isAuth)
-    
+
     async deletePost(
         @Arg('id', () => Int) id: number,
         @Ctx() {req} : MyContext

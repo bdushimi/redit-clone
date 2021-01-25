@@ -9,7 +9,9 @@ import NextLink from 'next/link';
 import { useState }from 'react';
 import { UpdootSection } from '../components/UpdootSection';
 
+
 const Index = () => {
+
 
   const [variables, setVariables] = useState({
     limit: 10,
